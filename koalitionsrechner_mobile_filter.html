@@ -1,0 +1,148 @@
+
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Koalitionsrechner Mobil</title>
+<style>
+body{font-family:Arial, sans-serif;margin:0;padding:16px;max-width:1000px;margin:auto}
+h1{text-align:center}
+.container{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media (max-width:700px){.container{grid-template-columns:1fr}}
+.party{display:flex;justify-content:space-between;padding:8px;border-bottom:1px solid #ddd}
+.party label{display:flex;align-items:center;gap:8px}
+.colorbox{width:14px;height:14px;display:inline-block}
+.result{font-size:20px;font-weight:bold;margin-top:10px}
+.majority{color:green}.no-majority{color:red}
+button{padding:10px;margin-top:10px;width:100%}
+select{padding:6px;margin-top:5px}
+#coalitions{margin-top:20px;max-height:350px;overflow:auto;border:1px solid #ddd;padding:10px}
+canvas{width:100%;height:auto;margin-top:10px}
+</style>
+</head>
+<body>
+<h1>Koalitionsrechner</h1>
+<div class="container">
+<div>
+<h3>Parteien</h3>
+<div id="parties"></div>
+<div class="result">Sitze: <span id="seats">0</span></div>
+<div id="majority"></div>
+<button onclick="findCoalitions()">Minimale Mehrheiten berechnen</button>
+<h3>Filter: Anzahl Parteien</h3>
+<select id="sizeFilter"><option value="0">Alle</option></select>
+</div>
+<div>
+<h3>Parlament</h3>
+<canvas id="parliament" width="400" height="260"></canvas>
+</div>
+</div>
+<h3>Mögliche minimale Mehrheitskoalitionen</h3>
+<div id="coalitions"></div>
+<script>
+const parties=[
+{name:"OB",seats:1,color:"#999"},
+{name:"CSU",seats:19,color:"#000"},
+{name:"FREIE WÄHLER",seats:2,color:"#f28c28"},
+{name:"AfD",seats:5,color:"#009ee0"},
+{name:"GRÜNE",seats:21,color:"#1aa037"},
+{name:"SPD",seats:15,color:"#e3000f"},
+{name:"ÖDP",seats:2,color:"#f39200"},
+{name:"FDP",seats:3,color:"#ffed00"},
+{name:"Die Linke",seats:5,color:"#be3075"},
+{name:"Volt",seats:4,color:"#5a2ca0"},
+{name:"Die PARTEI",seats:1,color:"#888"},
+{name:"Rosa Liste",seats:1,color:"#ff66aa"},
+{name:"München-Liste",seats:1,color:"#66ccff"},
+{name:"BP",seats:0,color:"#003366"},
+{name:"BK",seats:1,color:"#444"}
+];
+const majority=41;
+let coalitionResults=[];
+const partyDiv=document.getElementById("parties");
+parties.forEach(p=>{
+const div=document.createElement("div");
+div.className="party";
+div.innerHTML=`
+<label>
+<input type="checkbox" value="${p.seats}" data-name="${p.name}" onchange="calculate()">
+<span class="colorbox" style="background:${p.color}"></span>
+${p.name}
+</label>
+<span>${p.seats}</span>`;
+partyDiv.appendChild(div);
+});
+for(let i=1;i<=15;i++){
+let opt=document.createElement("option");
+opt.value=i;
+opt.text=i+" Parteien";
+document.getElementById("sizeFilter").appendChild(opt);
+}
+document.getElementById("sizeFilter").addEventListener("change",renderCoalitions);
+function calculate(){
+let total=0;
+document.querySelectorAll("input[type=checkbox]").forEach(cb=>{if(cb.checked) total+=Number(cb.value);});
+document.getElementById("seats").innerText=total;
+const m=document.getElementById("majority");
+if(total>=majority){m.innerHTML="Mehrheit erreicht";m.className="majority";}
+else{m.innerHTML="Keine Mehrheit";m.className="no-majority";}
+drawParliament();
+}
+function drawParliament(){
+const canvas=document.getElementById("parliament");
+const ctx=canvas.getContext("2d");
+ctx.clearRect(0,0,canvas.width,canvas.height);
+let seats=[];
+parties.forEach(p=>{for(let i=0;i<p.seats;i++){seats.push(p.color);}});
+const total=seats.length;
+const radius=160;
+const centerX=200;
+const centerY=230;
+seats.forEach((color,i)=>{
+const angle=Math.PI*(i/(total-1));
+const x=centerX+radius*Math.cos(Math.PI-angle);
+const y=centerY-radius*Math.sin(Math.PI-angle);
+ctx.beginPath();
+ctx.arc(x,y,5,0,2*Math.PI);
+ctx.fillStyle=color;
+ctx.fill();
+});
+}
+function isMinimal(totalSeats,combo){
+for(let p of combo){
+let seat=parties.find(x=>x.name===p).seats;
+if(totalSeats-seat>=majority) return false;
+}
+return true;
+}
+function findCoalitions(){
+coalitionResults=[];
+const n=parties.length;
+for(let i=1;i<(1<<n);i++){
+let seats=0;
+let combo=[];
+for(let j=0;j<n;j++){
+if(i&(1<<j)){seats+=parties[j].seats;combo.push(parties[j].name);}
+}
+if(seats>=majority && isMinimal(seats,combo)){
+coalitionResults.push({names:combo,size:combo.length,seats:seats});
+}
+}
+renderCoalitions();
+}
+function renderCoalitions(){
+const filter=parseInt(document.getElementById("sizeFilter").value);
+const box=document.getElementById("coalitions");
+box.innerHTML="";
+coalitionResults.forEach(c=>{
+if(filter!==0 && c.size!==filter) return;
+const div=document.createElement("div");
+div.innerText=c.names.join(" + ")+" ("+c.seats+")";
+box.appendChild(div);
+});
+}
+drawParliament();
+</script>
+</body>
+</html>
