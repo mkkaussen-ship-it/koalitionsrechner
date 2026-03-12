@@ -1,0 +1,313 @@
+
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Koalitionsrechner Pro+</title>
+<style>
+
+body{
+font-family:Arial, sans-serif;
+max-width:1100px;
+margin:auto;
+padding:20px;
+}
+
+h1{text-align:center}
+
+.container{
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:40px;
+}
+
+.party{
+display:flex;
+justify-content:space-between;
+padding:6px;
+border-bottom:1px solid #ddd;
+}
+
+.party label{
+display:flex;
+align-items:center;
+gap:6px;
+}
+
+.colorbox{
+width:14px;
+height:14px;
+display:inline-block;
+}
+
+.result{
+font-size:22px;
+font-weight:bold;
+margin-top:10px;
+}
+
+.majority{color:green}
+.no-majority{color:red}
+
+button{
+padding:8px 12px;
+margin-top:10px;
+cursor:pointer;
+}
+
+#coalitions{
+margin-top:20px;
+max-height:300px;
+overflow:auto;
+border:1px solid #ddd;
+padding:10px;
+}
+
+canvas{
+margin-top:10px;
+border:1px solid #ddd;
+}
+
+.rule{
+display:flex;
+gap:10px;
+margin-top:5px;
+}
+
+</style>
+</head>
+
+<body>
+
+<h1>Koalitionsrechner Pro+</h1>
+
+<div class="container">
+
+<div>
+
+<h3>Parteien</h3>
+<div id="parties"></div>
+
+<div class="result">
+Sitze: <span id="seats">0</span>
+</div>
+
+<div id="majority"></div>
+
+<button onclick="findCoalitions()">Minimale Mehrheitskoalitionen berechnen</button>
+
+<h3>Ausschlussregel hinzufügen</h3>
+
+<div class="rule">
+<select id="ruleA"></select>
+<select id="ruleB"></select>
+<button onclick="addRule()">Regel hinzufügen</button>
+</div>
+
+<ul id="rules"></ul>
+
+</div>
+
+<div>
+
+<h3>Parlament</h3>
+<canvas id="parliament" width="500" height="300"></canvas>
+
+</div>
+
+</div>
+
+<h3>Mögliche minimale Mehrheitskoalitionen</h3>
+<div id="coalitions"></div>
+
+<script>
+
+const parties = [
+{name:"OB", seats:1, color:"#999"},
+{name:"CSU", seats:19, color:"#000000"},
+{name:"FREIE WÄHLER", seats:2, color:"#f28c28"},
+{name:"AfD", seats:5, color:"#009ee0"},
+{name:"GRÜNE", seats:21, color:"#1aa037"},
+{name:"SPD", seats:15, color:"#e3000f"},
+{name:"ÖDP", seats:2, color:"#f39200"},
+{name:"FDP", seats:3, color:"#ffed00"},
+{name:"Die Linke", seats:5, color:"#be3075"},
+{name:"Volt", seats:4, color:"#5a2ca0"},
+{name:"Die PARTEI", seats:1, color:"#888"},
+{name:"Rosa Liste", seats:1, color:"#ff66aa"},
+{name:"München-Liste", seats:1, color:"#66ccff"},
+{name:"BP", seats:0, color:"#003366"},
+{name:"BK", seats:1, color:"#444"}
+];
+
+const majority = 41;
+let exclusions = [];
+
+const partyDiv=document.getElementById("parties");
+const ruleA=document.getElementById("ruleA");
+const ruleB=document.getElementById("ruleB");
+
+parties.forEach(p=>{
+
+const div=document.createElement("div");
+div.className="party";
+
+div.innerHTML=`
+<label>
+<input type="checkbox" data-name="${p.name}" value="${p.seats}" onchange="calculate()">
+<span class="colorbox" style="background:${p.color}"></span>
+${p.name}
+</label>
+<span>${p.seats}</span>
+`;
+
+partyDiv.appendChild(div);
+
+const o1=document.createElement("option");
+o1.value=p.name;
+o1.text=p.name;
+ruleA.appendChild(o1);
+
+const o2=document.createElement("option");
+o2.value=p.name;
+o2.text=p.name;
+ruleB.appendChild(o2);
+
+});
+
+function calculate(){
+
+let total=0;
+
+document.querySelectorAll("input[type=checkbox]").forEach(cb=>{
+if(cb.checked) total+=Number(cb.value);
+});
+
+document.getElementById("seats").innerText=total;
+
+const m=document.getElementById("majority");
+
+if(total>=majority){
+m.innerHTML="Mehrheit erreicht";
+m.className="majority";
+}else{
+m.innerHTML="Keine Mehrheit";
+m.className="no-majority";
+}
+
+drawParliament();
+
+}
+
+function drawParliament(){
+
+const canvas=document.getElementById("parliament");
+const ctx=canvas.getContext("2d");
+
+ctx.clearRect(0,0,canvas.width,canvas.height);
+
+let seats=[];
+
+parties.forEach(p=>{
+for(let i=0;i<p.seats;i++){
+seats.push(p.color);
+}
+});
+
+const total=seats.length;
+const radius=200;
+const centerX=250;
+const centerY=260;
+
+seats.forEach((color,i)=>{
+
+const angle=Math.PI*(i/(total-1));
+
+const x=centerX+radius*Math.cos(Math.PI-angle);
+const y=centerY-radius*Math.sin(Math.PI-angle);
+
+ctx.beginPath();
+ctx.arc(x,y,6,0,2*Math.PI);
+ctx.fillStyle=color;
+ctx.fill();
+
+});
+
+}
+
+function violates(combo){
+
+for(let r of exclusions){
+if(combo.includes(r[0]) && combo.includes(r[1])) return true;
+}
+
+return false;
+
+}
+
+function isMinimal(comboSeats,combo){
+
+for(let p of combo){
+let reducedSeats=comboSeats-parties.find(x=>x.name==p).seats;
+if(reducedSeats>=majority) return false;
+}
+
+return true;
+
+}
+
+function findCoalitions(){
+
+let results=[];
+const n=parties.length;
+
+for(let i=1;i<(1<<n);i++){
+
+let seats=0;
+let combo=[];
+
+for(let j=0;j<n;j++){
+if(i&(1<<j)){
+seats+=parties[j].seats;
+combo.push(parties[j].name);
+}
+}
+
+if(seats>=majority && !violates(combo) && isMinimal(seats,combo)){
+results.push(combo.join(" + ")+" ("+seats+")");
+}
+
+}
+
+const box=document.getElementById("coalitions");
+box.innerHTML="";
+
+results.forEach(r=>{
+const div=document.createElement("div");
+div.innerText=r;
+box.appendChild(div);
+});
+
+}
+
+function addRule(){
+
+const a=ruleA.value;
+const b=ruleB.value;
+
+if(a===b) return;
+
+exclusions.push([a,b]);
+
+const li=document.createElement("li");
+li.innerText=a+" darf nicht mit "+b;
+document.getElementById("rules").appendChild(li);
+
+}
+
+drawParliament();
+
+</script>
+
+</body>
+</html>
